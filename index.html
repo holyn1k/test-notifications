@@ -3,133 +3,141 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Настройка уведомлений</title>
+    <title>Фикс уведомлений</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes pulse-red {
+            0%, 100% { background-color: rgba(220, 38, 38, 0.1); }
+            50% { background-color: rgba(220, 38, 38, 0.3); }
+        }
+        .error-pulse { animation: pulse-red 2s infinite; }
+    </style>
 </head>
-<body class="bg-slate-900 text-white min-h-screen flex items-center justify-center p-6 font-sans">
+<body class="bg-gray-100 min-h-screen p-4 font-sans">
 
-    <div class="max-w-md w-full bg-slate-800 rounded-3xl p-8 shadow-2xl border border-slate-700">
-        <h1 class="text-2xl font-bold mb-4 text-center">Статус системы</h1>
-        
-        <!-- Панель диагностики -->
-        <div class="space-y-3 mb-8">
-            <div class="flex items-center justify-between p-3 bg-slate-900/50 rounded-xl">
-                <span>Разрешение:</span>
-                <span id="perm-status" class="font-mono text-yellow-400">проверка...</span>
+    <div class="max-w-md mx-auto bg-white rounded-3xl shadow-xl overflow-hidden mt-10 border border-gray-200">
+        <div class="bg-indigo-600 p-6 text-white">
+            <h1 class="text-xl font-bold">Реаниматор уведомлений</h1>
+            <p class="text-sm opacity-80">Поиск причин блокировки на Android</p>
+        </div>
+
+        <div class="p-6 space-y-4">
+            <!-- Статус браузера -->
+            <div id="check-list" class="space-y-2 text-sm">
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border" id="step-https">
+                    <span>Защищенное соединение (HTTPS)</span>
+                    <span class="status-icon">⏳</span>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border" id="step-perm">
+                    <span>Разрешение в браузере</span>
+                    <span class="status-icon">⏳</span>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg border" id="step-sw">
+                    <span>Регистрация фонового процесса</span>
+                    <span class="status-icon">⏳</span>
+                </div>
             </div>
-            <div class="flex items-center justify-between p-3 bg-slate-900/50 rounded-xl">
-                <span>Service Worker:</span>
-                <span id="sw-status" class="font-mono text-red-400">не активен</span>
+
+            <div class="bg-blue-50 border-l-4 border-blue-500 p-4 text-xs text-blue-800">
+                <strong>Важно для Android/Xiaomi:</strong><br>
+                Если все пункты станут зелеными, но уведомлений нет — зайдите в <i>Настройки -> Приложения -> Chrome -> Уведомления</i> и проверьте категорию "Сайты".
             </div>
-        </div>
 
-        <div id="log" class="text-xs bg-black/30 p-4 rounded-xl mb-6 h-32 overflow-y-auto font-mono text-slate-400">
-            > Ожидание действий пользователя...<br>
-        </div>
-
-        <div class="grid gap-4">
-            <button id="request-btn" class="bg-blue-600 hover:bg-blue-500 py-4 rounded-2xl font-bold transition-all active:scale-95">
-                1. Запросить доступ
+            <button id="main-btn" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-2xl shadow-lg active:scale-95 transition-transform">
+                ЗАПУСТИТЬ ТЕСТ (5 сек)
             </button>
-            <button id="test-btn" class="bg-emerald-600 hover:bg-emerald-500 py-4 rounded-2xl font-bold transition-all active:scale-95 opacity-50 cursor-not-allowed" disabled>
-                2. Проверить (5 сек)
-            </button>
-        </div>
 
-        <div class="mt-8 text-sm text-slate-400">
-            <p class="mb-2">⚠️ **Почему вы их не видите?**</p>
-            <ul class="list-disc pl-5 space-y-1 text-xs">
-                <li>В Android отключены уведомления для Chrome/браузера.</li>
-                <li>Включен режим "Не беспокоить" или "Экономия заряда".</li>
-                <li>Сайт открыт не через HTTPS (для уведомлений это обязательно).</li>
-            </ul>
+            <div id="console" class="bg-gray-900 text-green-400 p-4 rounded-xl font-mono text-[10px] h-40 overflow-y-auto">
+                > Ожидание команды...<br>
+            </div>
         </div>
     </div>
 
     <script>
-        const permEl = document.getElementById('perm-status');
-        const swEl = document.getElementById('sw-status');
-        const logEl = document.getElementById('log');
-        const reqBtn = document.getElementById('request-btn');
-        const testBtn = document.getElementById('test-btn');
+        const btn = document.getElementById('main-btn');
+        const consoleEl = document.getElementById('console');
 
-        function addLog(msg) {
-            logEl.innerHTML += `> ${msg}<br>`;
-            logEl.scrollTop = logEl.scrollHeight;
+        function log(msg, color = '') {
+            const span = document.createElement('span');
+            span.innerHTML = `> ${msg}<br>`;
+            if (color) span.className = color;
+            consoleEl.appendChild(span);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
         }
 
-        async function updateStatus() {
-            const status = Notification.permission;
-            permEl.textContent = status;
-            permEl.className = status === 'granted' ? 'text-emerald-400' : 'text-yellow-400';
-            
-            if (status === 'granted') {
-                testBtn.disabled = false;
-                testBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            }
+        function setStep(id, success) {
+            const el = document.getElementById(id);
+            el.querySelector('.status-icon').textContent = success ? '✅' : '❌';
+            el.classList.add(success ? 'border-green-200' : 'border-red-200');
+            if (!success) el.classList.add('error-pulse');
         }
 
-        // Регистрация Service Worker (нужен для надежных уведомлений в фоне)
-        async function initSW() {
+        async function initDiagnostics() {
+            // 1. HTTPS
+            const isHttps = window.location.protocol === 'https:';
+            setStep('step-https', isHttps);
+            if (!isHttps) log("ОШИБКА: Уведомления требуют HTTPS!", "text-red-500");
+
+            // 2. Permission
+            const perm = Notification.permission;
+            setStep('step-perm', perm === 'granted');
+            log(`Текущее разрешение: ${perm}`);
+
+            // 3. Service Worker
             if ('serviceWorker' in navigator) {
                 try {
-                    const blob = new Blob([`
-                        self.addEventListener('notificationclick', function(event) {
-                            event.notification.close();
-                            event.waitUntil(clients.openWindow('/'));
+                    // Создаем SW "на лету"
+                    const swCode = `
+                        self.addEventListener('push', e => {});
+                        self.addEventListener('notificationclick', e => {
+                            e.notification.close();
+                            clients.openWindow('/');
                         });
-                    `], { type: 'application/javascript' });
-                    const url = URL.createObjectURL(blob);
-                    const reg = await navigator.serviceWorker.register(url);
-                    swEl.textContent = 'готов';
-                    swEl.className = 'text-emerald-400';
-                    addLog("Service Worker зарегистрирован");
-                    return reg;
+                    `;
+                    const blob = new Blob([swCode], {type: 'application/javascript'});
+                    const reg = await navigator.serviceWorker.register(URL.createObjectURL(blob));
+                    setStep('step-sw', true);
+                    log("Service Worker успешно внедрен");
                 } catch (e) {
-                    addLog("Ошибка SW: " + e.message);
+                    setStep('step-sw', false);
+                    log("ОШИБКА SW: " + e.message, "text-red-500");
                 }
-            } else {
-                addLog("SW не поддерживается браузером");
             }
         }
 
-        reqBtn.addEventListener('click', async () => {
-            addLog("Запрос разрешения...");
+        btn.addEventListener('click', async () => {
+            log("Запрос разрешения...");
             const permission = await Notification.requestPermission();
-            updateStatus();
-            if (permission === 'granted') {
-                addLog("Доступ получен!");
-            } else {
-                addLog("В доступе отказано.");
+            setStep('step-perm', permission === 'granted');
+
+            if (permission !== 'granted') {
+                log("ОТКАЗАНО. Нужно вручную сбросить настройки сайта в браузере.", "text-red-400");
+                return;
             }
-        });
 
-        testBtn.addEventListener('click', async () => {
-            const reg = await navigator.serviceWorker.ready;
-            addLog("Таймер запущен (5 сек)");
+            log("Запуск цикла уведомлений (каждые 5 сек)...");
             
-            setInterval(() => {
-                const title = "Вернись на сайт!";
-                const options = {
-                    body: "Уведомление отправлено в " + new Date().toLocaleTimeString(),
-                    icon: "https://cdn-icons-png.flaticon.com/512/182/182321.png",
-                    vibrate: [200, 100, 200],
-                    tag: "spam-prevent",
-                    renotify: true
-                };
+            const triggerNotification = async () => {
+                const reg = await navigator.serviceWorker.ready;
+                log("Отправка сигнала...");
                 
-                // Используем регистрацию Service Worker для показа
-                reg.showNotification(title, options);
-                addLog("Уведомление отправлено");
-            }, 5000);
+                // На Android лучше работает через SW
+                await reg.showNotification("Сайт вызывает вас!", {
+                    body: "Нажмите, чтобы вернуться на страницу. Время: " + new Date().toLocaleTimeString(),
+                    icon: "https://cdn-icons-png.flaticon.com/512/3119/3119338.png",
+                    tag: "site-recall", // Заменяет старое уведомление новым (не спамит список)
+                    badge: "https://cdn-icons-png.flaticon.com/512/3119/3119338.png",
+                    vibrate: [100, 50, 100],
+                    requireInteraction: true
+                });
+            };
+
+            // Первый запуск
+            triggerNotification();
+            setInterval(triggerNotification, 5000);
         });
 
-        window.onload = () => {
-            updateStatus();
-            initSW();
-        };
+        window.onload = initDiagnostics;
     </script>
 </body>
 </html>
-
-
