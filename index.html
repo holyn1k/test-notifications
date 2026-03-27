@@ -3,114 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Система уведомлений 2.0</title>
+    <title>Напоминатор 6.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="manifest" id="my-manifest">
 </head>
-<body class="bg-black text-white min-h-screen flex flex-col items-center justify-center p-6 text-center">
+<body class="bg-zinc-950 text-white min-h-screen flex items-center justify-center p-6 font-sans">
 
-    <div class="bg-zinc-900 p-8 rounded-[3rem] w-full max-w-sm border border-zinc-800 shadow-2xl">
-        <div class="text-5xl mb-6">🔥</div>
-        <h1 class="text-2xl font-black mb-4">БРУТФОРС УВЕДОМЛЕНИЙ</h1>
-        
-        <p class="text-zinc-400 text-sm mb-8 leading-relaxed">
-            Если после нажатия кнопки ничего не происходит — проверь статус <b>HTTPS</b> и разрешение в настройках Chrome.
-        </p>
+    <div class="max-w-sm w-full bg-zinc-900 rounded-[2.5rem] p-8 border border-zinc-800 text-center shadow-2xl">
+        <div class="text-6xl mb-4">🔔</div>
+        <h1 class="text-2xl font-black mb-2 uppercase tracking-tighter">Система Активирована</h1>
+        <p class="text-zinc-500 text-xs mb-8">Разреши уведомления и сверни браузер. Если закроешь вкладку полностью — работать не будет.</p>
 
-        <div class="space-y-4">
-            <button id="btn-start" class="w-full bg-blue-600 py-5 rounded-3xl font-bold active:scale-95 transition-all shadow-lg shadow-blue-900/40">
-                1. ВКЛЮЧИТЬ СПАМ
-            </button>
-            <button id="btn-install" class="hidden w-full bg-white text-black py-5 rounded-3xl font-bold active:scale-95 transition-all">
-                2. УСТАНОВИТЬ (PWA)
-            </button>
+        <div id="status-display" class="mb-6 p-4 bg-black/40 rounded-2xl text-[10px] font-mono text-left text-zinc-400">
+            > Ожидание старта...
         </div>
 
-        <div id="status" class="mt-8 text-[10px] font-mono text-zinc-600 bg-black/50 p-4 rounded-2xl text-left h-24 overflow-y-auto">
-            > Ожидание команды...
+        <button id="start-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-5 rounded-3xl active:scale-95 transition-all shadow-lg shadow-indigo-500/20">
+            ЗАПУСТИТЬ СПАМ
+        </button>
+
+        <div class="mt-8 pt-6 border-t border-zinc-800 text-left">
+            <p class="text-[10px] text-zinc-500 font-bold mb-2 uppercase">Почему не работает?</p>
+            <ul class="text-[9px] text-zinc-600 space-y-1">
+                <li>• Выключен звук или режим "Не беспокоить".</li>
+                <li>• В настройках Android для Chrome запрещены "Всплывающие уведомления".</li>
+                <li>• Система Xiaomi убивает Chrome для экономии заряда (нужно выключить в настройках приложения).</li>
+            </ul>
         </div>
     </div>
 
     <script>
-        const btnStart = document.getElementById('btn-start');
-        const btnInstall = document.getElementById('btn-install');
-        const statusEl = document.getElementById('status');
-        let deferredPrompt;
-
-        // Создаем манифест "на лету"
-        const manifest = {
-            "name": "SpamNotify",
-            "short_name": "Spam",
-            "start_url": window.location.href,
-            "display": "standalone",
-            "icons": [{"src": "https://cdn-icons-png.flaticon.com/512/3119/3119338.png", "sizes": "512x512", "type": "image/png"}]
-        };
-        document.getElementById('my-manifest').setAttribute('href', URL.createObjectURL(new Blob([JSON.stringify(manifest)], {type: 'application/json'})));
+        const btn = document.getElementById('start-btn');
+        const status = document.getElementById('status-display');
+        let intervalId = null;
 
         function log(msg) {
-            statusEl.innerHTML = `> ${msg}<br>` + statusEl.innerHTML;
+            const time = new Date().toLocaleTimeString().split(' ')[0];
+            status.innerHTML = `[${time}] ${msg}<br>` + status.innerHTML;
         }
 
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            btnInstall.classList.remove('hidden');
-        });
+        async function sendNotification() {
+            const title = "ВЕРНИСЬ НА САЙТ!";
+            const options = {
+                body: "Прошло 5 секунд. Мы все еще здесь!",
+                icon: "https://cdn-icons-png.flaticon.com/512/3119/3119338.png",
+                tag: "recall-msg", // Перезаписывает старое, чтобы не спамить 100 штук
+                renotify: true,
+                silent: false,
+                requireInteraction: true
+            };
 
-        btnInstall.addEventListener('click', () => {
-            if (deferredPrompt) deferredPrompt.prompt();
-        });
-
-        async function init() {
-            // 1. Проверка HTTPS
-            if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-                log("ОШИБКА: Только HTTPS!");
-                return;
-            }
-
-            // 2. Регистрация Service Worker
-            if ('serviceWorker' in navigator) {
-                try {
-                    const swCode = `
-                        self.addEventListener('install', e => self.skipWaiting());
-                        self.addEventListener('activate', e => e.waitUntil(clients.claim()));
-
-                        // Фоновый цикл
-                        setInterval(() => {
-                            self.registration.showNotification('ЗАЙДИ НА САЙТ!', {
-                                body: 'Это уведомление из фона (каждые 5 сек)',
-                                icon: 'https://cdn-icons-png.flaticon.com/512/3119/3119338.png',
-                                tag: 'spam-tag',
-                                renotify: true,
-                                vibrate: [500, 100, 500]
-                            });
-                        }, 5000);
-                    `;
-                    const blob = new Blob([swCode], {type: 'application/javascript'});
-                    const reg = await navigator.serviceWorker.register(URL.createObjectURL(blob));
-                    log("Service Worker: OK");
-
-                    btnStart.addEventListener('click', async () => {
-                        const permission = await Notification.requestPermission();
-                        if (permission === 'granted') {
-                            log("Доступ получен!");
-                            btnStart.textContent = "ЗАПУЩЕНО";
-                            btnStart.className = "w-full bg-zinc-800 text-zinc-500 py-5 rounded-3xl font-bold cursor-not-allowed";
-                            
-                            // Отправка первого уведомления
-                            reg.showNotification('ПОЕХАЛИ!', { body: 'Теперь уведомления будут идти в фоне.' });
-                        } else {
-                            log("ОШИБКА: Нет доступа!");
-                        }
-                    });
-
-                } catch (err) {
-                    log("Ошибка SW: " + err.message);
+            try {
+                // Пытаемся отправить напрямую
+                new Notification(title, options);
+                log("Импульс отправлен");
+                
+                // Вибрация (для Android)
+                if (navigator.vibrate) {
+                    navigator.vibrate([200, 100, 200]);
                 }
+            } catch (e) {
+                log("Ошибка отправки: " + e.message);
             }
         }
 
-        init();
+        btn.addEventListener('click', async () => {
+            log("Запрос прав...");
+            const permission = await Notification.requestPermission();
+            
+            if (permission === 'granted') {
+                log("Доступ ЕСТЬ. Старт цикла...");
+                btn.disabled = true;
+                btn.textContent = "РАБОТАЕТ В ФОНЕ";
+                btn.className = "w-full bg-zinc-800 text-zinc-600 font-bold py-5 rounded-3xl cursor-not-allowed";
+
+                // Первый запуск
+                sendNotification();
+
+                // Цикл (каждые 5 секунд)
+                intervalId = setInterval(() => {
+                    sendNotification();
+                }, 5000);
+
+                log("Сверни браузер кнопкой Домой");
+            } else {
+                log("ОТКАЗАНО. Проверь настройки сайта.");
+            }
+        });
+
+        // Предотвращение остановки таймера браузером (хитрость)
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                log("Приложение ушло в фон...");
+            } else {
+                log("Приложение активно");
+            }
+        });
     </script>
 </body>
-    </html>
+</html>
+
