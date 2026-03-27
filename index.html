@@ -3,116 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Напоминатор 8.0</title>
+    <title>Напоминатор 9.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="manifest" id="manifest-link">
 </head>
-<body class="bg-black text-white min-h-screen flex items-center justify-center p-6 font-sans">
+<body class="bg-slate-950 text-white min-h-screen flex items-center justify-center p-6 font-sans text-center">
 
-    <div class="max-w-sm w-full bg-zinc-900 rounded-[2.5rem] p-8 border border-zinc-800 text-center shadow-2xl">
-        <div class="text-6xl mb-6">🎯</div>
-        <h1 class="text-2xl font-black mb-2 uppercase">Фикс Ошибки</h1>
-        <p class="text-zinc-500 text-[10px] mb-8 uppercase tracking-widest">Теперь используется системный ServiceWorker</p>
+    <div class="max-w-sm w-full bg-slate-900 rounded-[3rem] p-10 border border-slate-800 shadow-2xl relative overflow-hidden">
+        <div class="relative z-10">
+            <div class="text-6xl mb-6">🚀</div>
+            <h1 class="text-3xl font-black mb-4">БЕЗ ОШИБОК</h1>
+            <p class="text-slate-400 text-sm mb-8">Этот метод работает напрямую через таймер. Просто разреши доступ и сверни браузер.</p>
 
-        <div id="console" class="mb-6 p-4 bg-black/40 rounded-2xl text-[10px] font-mono text-left text-emerald-500 h-32 overflow-y-auto border border-emerald-500/10">
-            > Ожидание инициализации...
+            <button id="start-btn" class="w-full bg-blue-600 hover:bg-blue-500 py-5 rounded-3xl font-bold shadow-xl active:scale-95 transition-all">
+                АКТИВИРОВАТЬ
+            </button>
         </div>
 
-        <button id="start-btn" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-5 rounded-3xl active:scale-95 transition-all shadow-lg">
-            ЗАПУСТИТЬ ЦИКЛ
-        </button>
-
-        <div class="mt-8 text-[9px] text-zinc-600 text-left space-y-2 italic">
-            * На Android Chrome требует ServiceWorker для показа уведомлений.<br>
-            * Если уведомлений нет в шторке, проверь настройки "Всплывающие уведомления" в Chrome.
+        <div id="log" class="mt-8 bg-black/40 p-4 rounded-2xl text-[10px] font-mono text-blue-400 text-left h-24 overflow-y-auto">
+            > Готов к работе...
         </div>
     </div>
 
     <script>
         const btn = document.getElementById('start-btn');
-        const consoleEl = document.getElementById('console');
+        const logEl = document.getElementById('log');
 
-        function log(msg) {
-            const time = new Date().toLocaleTimeString();
-            consoleEl.innerHTML = `[${time}] ${msg}<br>` + consoleEl.innerHTML;
+        function addLog(msg) {
+            logEl.innerHTML = `> ${msg}<br>` + logEl.innerHTML;
         }
 
-        // Создаем манифест для PWA (помогает с правами)
-        const manifest = {
-            "name": "Notifier Fix",
-            "short_name": "Notify",
-            "start_url": window.location.href,
-            "display": "standalone",
-            "icons": [{"src": "https://cdn-icons-png.flaticon.com/512/3119/3119338.png", "sizes": "512x512", "type": "image/png"}]
-        };
-        document.getElementById('manifest-link').setAttribute('href', 'data:application/json;base64,' + btoa(JSON.stringify(manifest)));
+        // Функция показа уведомления (вызывается через браузер)
+        function showNotification() {
+            const options = {
+                body: "ЗАЙДИ НА САЙТ! Прошло 5 секунд.",
+                icon: "https://cdn-icons-png.flaticon.com/512/3119/3119338.png",
+                tag: "recall-spam",
+                renotify: true,
+                vibrate: [200, 100, 200],
+                requireInteraction: true
+            };
 
-        async function init() {
-            if (!('serviceWorker' in navigator)) {
-                log("ОШИБКА: Браузер не поддерживает Service Worker");
-                return;
-            }
-
-            // Пытаемся зарегистрировать Service Worker через Data URL (обход блокировки blob на некоторых хостингах)
-            const swCode = `
-                self.addEventListener('install', e => self.skipWaiting());
-                self.addEventListener('activate', e => e.waitUntil(clients.claim()));
-                
-                self.addEventListener('message', e => {
-                    if (e.data.type === 'NOTIFY') {
-                        self.registration.showNotification(e.data.title, e.data.options);
-                    }
-                });
-            `;
-            const swUrl = 'data:text/javascript;base64,' + btoa(swCode);
-
+            // Пробуем два метода сразу
             try {
-                const reg = await navigator.serviceWorker.register(swUrl);
-                log("Service Worker: ГОТОВ");
-
-                btn.addEventListener('click', async () => {
-                    log("Запрос прав...");
-                    const perm = await Notification.requestPermission();
-                    
-                    if (perm === 'granted') {
-                        log("Доступ получен! Старт...");
-                        btn.disabled = true;
-                        btn.textContent = "РАБОТАЕТ (СВЕРНИТЕ)";
-                        btn.className = "w-full bg-zinc-800 text-zinc-600 font-bold py-5 rounded-3xl";
-
-                        setInterval(() => {
-                            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-                            
-                            // Отправляем команду в Service Worker
-                            if (reg.active) {
-                                reg.active.postMessage({
-                                    type: 'NOTIFY',
-                                    title: 'ВЕРНИСЬ НА САЙТ!',
-                                    options: {
-                                        body: 'Прошло 5 секунд. Мы ждем!',
-                                        icon: 'https://cdn-icons-png.flaticon.com/512/3119/3119338.png',
-                                        tag: 'recall-force',
-                                        renotify: true,
-                                        requireInteraction: true,
-                                        vibrate: [200, 100, 200]
-                                    }
-                                });
-                                log("Сигнал отправлен");
-                            }
-                        }, 5000);
-                        
-                        log("СВЕРНИТЕ БРАУЗЕР (Домой)");
-                    } else {
-                        log("ОШИБКА: Доступ отклонен");
-                    }
-                });
+                // Метод 1 (Standard)
+                new Notification("ВНИМАНИЕ!", options);
             } catch (e) {
-                log("Критическая ошибка SW: " + e.message);
-                log("Попробуйте открыть сайт через HTTPS.");
+                // Метод 2 (Fallback через регистрацию, если доступна)
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.ready.then(reg => {
+                        reg.showNotification("ВНИМАНИЕ!", options);
+                    });
+                }
             }
+            
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            addLog("Сигнал отправлен");
         }
 
-        window.onload = init;
+        btn.addEventListener('click', async () => {
+            addLog("Запрос доступа...");
+            const permission = await Notification.requestPermission();
+            
+            if (permission === 'granted') {
+                addLog("Доступ получен! Старт...");
+                btn.textContent = "РАБОТАЕТ";
+                btn.disabled = true;
+                btn.className = "w-full bg-slate-800 text-slate-500 py-5 rounded-3xl cursor-not-allowed";
+
+                // Запускаем цикл каждые 5 секунд
+                setInterval(showNotification, 5000);
+                
+                addLog("СВЕРНИТЕ БРАУЗЕР КНОПКОЙ ДОМОЙ");
+            } else {
+                addLog("ОШИБКА: Доступ отклонен.");
+            }
+        });
     </script>
 </body>
 </html>
