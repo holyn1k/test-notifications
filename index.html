@@ -3,99 +3,109 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Напоминатор 6.0</title>
+    <title>Напоминатор 7.0</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .active-glow {
+            box-shadow: 0 0 30px rgba(79, 70, 229, 0.6);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+    </style>
 </head>
-<body class="bg-zinc-950 text-white min-h-screen flex items-center justify-center p-6 font-sans">
+<body class="bg-slate-950 text-slate-200 min-h-screen flex items-center justify-center p-6 font-sans">
 
-    <div class="max-w-sm w-full bg-zinc-900 rounded-[2.5rem] p-8 border border-zinc-800 text-center shadow-2xl">
-        <div class="text-6xl mb-4">🔔</div>
-        <h1 class="text-2xl font-black mb-2 uppercase tracking-tighter">Система Активирована</h1>
-        <p class="text-zinc-500 text-xs mb-8">Разреши уведомления и сверни браузер. Если закроешь вкладку полностью — работать не будет.</p>
+    <div id="card" class="max-w-sm w-full bg-slate-900 rounded-[2.5rem] p-8 border border-slate-800 text-center transition-all duration-500">
+        <div class="text-6xl mb-6">📢</div>
+        <h1 class="text-2xl font-black mb-2 text-white">ФОНОВЫЙ ЦИКЛ</h1>
+        <p class="text-slate-500 text-xs mb-8">Если уведомлений нет в шторке, проверьте настройки «Всплывающие уведомления» в параметрах Chrome.</p>
 
-        <div id="status-display" class="mb-6 p-4 bg-black/40 rounded-2xl text-[10px] font-mono text-left text-zinc-400">
-            > Ожидание старта...
+        <div id="console" class="mb-6 p-4 bg-black/50 rounded-2xl text-[10px] font-mono text-left text-indigo-400 h-32 overflow-y-auto border border-indigo-500/10">
+            > Система готова к запуску...
         </div>
 
-        <button id="start-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-5 rounded-3xl active:scale-95 transition-all shadow-lg shadow-indigo-500/20">
-            ЗАПУСТИТЬ СПАМ
+        <button id="main-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-5 rounded-3xl active:scale-95 transition-all shadow-xl">
+            ВКЛЮЧИТЬ (5 СЕК)
         </button>
 
-        <div class="mt-8 pt-6 border-t border-zinc-800 text-left">
-            <p class="text-[10px] text-zinc-500 font-bold mb-2 uppercase">Почему не работает?</p>
-            <ul class="text-[9px] text-zinc-600 space-y-1">
-                <li>• Выключен звук или режим "Не беспокоить".</li>
-                <li>• В настройках Android для Chrome запрещены "Всплывающие уведомления".</li>
-                <li>• Система Xiaomi убивает Chrome для экономии заряда (нужно выключить в настройках приложения).</li>
-            </ul>
+        <div class="mt-8 text-[10px] text-slate-600 space-y-2 uppercase font-bold tracking-widest">
+            <p id="battery-status">🔋 Проверьте режим экономии</p>
+            <p id="perm-status">🔒 Разрешение не получено</p>
         </div>
     </div>
 
+    <!-- Тихий звук для поддержания жизни процесса -->
+    <audio id="silent-audio" loop>
+        <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg">
+    </audio>
+
     <script>
-        const btn = document.getElementById('start-btn');
-        const status = document.getElementById('status-display');
-        let intervalId = null;
+        const btn = document.getElementById('main-btn');
+        const consoleEl = document.getElementById('console');
+        const card = document.getElementById('card');
+        const silentAudio = document.getElementById('silent-audio');
+        const permStatus = document.getElementById('perm-status');
 
         function log(msg) {
-            const time = new Date().toLocaleTimeString().split(' ')[0];
-            status.innerHTML = `[${time}] ${msg}<br>` + status.innerHTML;
+            const time = new Date().toLocaleTimeString();
+            consoleEl.innerHTML = `[${time}] ${msg}<br>` + consoleEl.innerHTML;
         }
 
-        async function sendNotification() {
-            const title = "ВЕРНИСЬ НА САЙТ!";
+        async function triggerNotification() {
             const options = {
-                body: "Прошло 5 секунд. Мы все еще здесь!",
+                body: "Пора вернуться! Прошло 5 секунд.",
                 icon: "https://cdn-icons-png.flaticon.com/512/3119/3119338.png",
-                tag: "recall-msg", // Перезаписывает старое, чтобы не спамить 100 штук
+                badge: "https://cdn-icons-png.flaticon.com/512/3119/3119338.png",
+                tag: "force-recall",
                 renotify: true,
+                vibrate: [200, 100, 200],
                 silent: false,
                 requireInteraction: true
             };
 
             try {
-                // Пытаемся отправить напрямую
-                new Notification(title, options);
-                log("Импульс отправлен");
+                // Прямое создание уведомления
+                new Notification("ВНИМАНИЕ!", options);
+                log("Сигнал отправлен");
                 
-                // Вибрация (для Android)
-                if (navigator.vibrate) {
-                    navigator.vibrate([200, 100, 200]);
-                }
+                if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
             } catch (e) {
-                log("Ошибка отправки: " + e.message);
+                log("Ошибка: " + e.message);
             }
         }
 
         btn.addEventListener('click', async () => {
-            log("Запрос прав...");
+            log("Запрос разрешения...");
             const permission = await Notification.requestPermission();
             
             if (permission === 'granted') {
-                log("Доступ ЕСТЬ. Старт цикла...");
+                log("Доступ получен! Старт...");
+                permStatus.textContent = "🔒 ДОСТУП РАЗРЕШЕН";
+                permStatus.className = "text-emerald-500";
+                
+                card.classList.add('active-glow', 'border-indigo-500/50');
                 btn.disabled = true;
                 btn.textContent = "РАБОТАЕТ В ФОНЕ";
-                btn.className = "w-full bg-zinc-800 text-zinc-600 font-bold py-5 rounded-3xl cursor-not-allowed";
+                btn.className = "w-full bg-slate-800 text-slate-500 font-bold py-5 rounded-3xl cursor-not-allowed";
 
-                // Первый запуск
-                sendNotification();
+                // Запускаем тихий звук, чтобы Android не убил процесс
+                silentAudio.volume = 0.01;
+                silentAudio.play().catch(e => log("Звук заблокирован (нужен клик)"));
 
-                // Цикл (каждые 5 секунд)
-                intervalId = setInterval(() => {
-                    sendNotification();
+                // Запуск интервала
+                setInterval(() => {
+                    triggerNotification();
                 }, 5000);
 
-                log("Сверни браузер кнопкой Домой");
+                log("СВЕРНИТЕ БРАУЗЕР (кнопка Домой)");
             } else {
-                log("ОТКАЗАНО. Проверь настройки сайта.");
-            }
-        });
-
-        // Предотвращение остановки таймера браузером (хитрость)
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                log("Приложение ушло в фон...");
-            } else {
-                log("Приложение активно");
+                log("ОШИБКА: Доступ отклонен!");
+                permStatus.textContent = "🔒 ДОСТУП ЗАБЛОКИРОВАН";
+                permStatus.className = "text-red-500";
             }
         });
     </script>
